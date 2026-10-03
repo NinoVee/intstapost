@@ -1,0 +1,23 @@
+{
+  "name": "@intstapost/worker",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch --env-file-if-exists=../../.env src/main.ts",
+    "start": "tsx src/main.ts",
+    "run-job": "tsx --env-file-if-exists=../../.env src/run-job.ts",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "@intstapost/core": "workspace:*",
+    "@intstapost/db": "workspace:*",
+    "@intstapost/media": "workspace:*",
+    "bullmq": "^6.3.11",
+    "ioredis": "^5.11.1",
+    "tsx": "^4.23.15"
+  },
+  "devDependencies": {
+    "sharp": "^0.35.5"
+  }
+}

@@ -1,0 +1,14 @@
+node_modules/
+.next/
+dist/
+coverage/
+*.tsbuildinfo
+.env
+.env.*
+!.env.example
+/data/
+/tmp/
+.DS_Store
+next-env.d.ts
+dump.rdb
+*.rdb

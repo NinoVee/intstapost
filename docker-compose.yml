@@ -1,0 +1,97 @@
+# Local / private-server deployment.
+#   cp .env.example .env   # fill APP_SECRET + ENCRYPTION_KEY
+#   docker compose up -d --build
+#   docker compose run --rm worker pnpm owner:create --email you@example.com --name "You"
+# All ports bind to 127.0.0.1 — put a TLS reverse proxy in front for remote access.
+
+x-app-env: &app-env
+  DATABASE_URL: postgres://intstapost:${POSTGRES_PASSWORD:-intstapost}@postgres:5432/intstapost
+  REDIS_URL: redis://redis:6379
+  MEDIA_ROOT: /data/media
+  TEMP_ROOT: /data/tmp
+  MEDIA_IMPORT_ROOTS: /import
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: intstapost
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-intstapost}
+      POSTGRES_DB: intstapost
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      - "127.0.0.1:5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U intstapost"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redisdata:/data
+    ports:
+      - "127.0.0.1:6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      retries: 20
+
+  # Optional S3-compatible storage: `docker compose --profile s3 up` and set STORAGE_DRIVER=s3.
+  minio:
+    image: minio/minio:latest
+    profiles: ["s3"]
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${S3_ACCESS_KEY_ID:-intstapost}
+      MINIO_ROOT_PASSWORD: ${S3_SECRET_ACCESS_KEY:-change-me-please}
+    volumes:
+      - miniodata:/data
+    ports:
+      - "127.0.0.1:9000:9000"
+      - "127.0.0.1:9001:9001"
+
+  migrate:
+    build: { context: ., dockerfile: docker/Dockerfile, target: worker }
+    env_file: ${ENV_FILE:-.env}
+    environment: *app-env
+    command: ["pnpm", "db:migrate"]
+    depends_on:
+      postgres: { condition: service_healthy }
+
+  web:
+    build: { context: ., dockerfile: docker/Dockerfile, target: web }
+    restart: unless-stopped
+    env_file: ${ENV_FILE:-.env}
+    environment: *app-env
+    volumes:
+      - media:/data
+    ports:
+      - "127.0.0.1:3000:3000"
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+      redis: { condition: service_healthy }
+
+  worker:
+    build: { context: ., dockerfile: docker/Dockerfile, target: worker }
+    restart: unless-stopped
+    env_file: ${ENV_FILE:-.env}
+    environment: *app-env
+    volumes:
+      - media:/data
+      # Read-only folder(s) the agent may import from (e.g. an iCloud Photos export).
+      - ${IMPORT_DIR:-./data/import}:/import:ro
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+      redis: { condition: service_healthy }
+
+volumes:
+  pgdata:
+  redisdata:
+  miniodata:
+  media:

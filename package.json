@@ -1,0 +1,29 @@
+{
+  "name": "intstapost",
+  "private": true,
+  "description": "Personal AI Instagram Content Agent \u2014 AI creates, human approves.",
+  "packageManager": "pnpm@10.28.0",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev": "pnpm --parallel --filter @intstapost/web --filter @intstapost/worker dev",
+    "build": "pnpm --filter @intstapost/web build",
+    "typecheck": "pnpm -r typecheck",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "db:generate": "pnpm --filter @intstapost/db generate",
+    "db:migrate": "pnpm --filter @intstapost/db migrate",
+    "db:seed": "pnpm --filter @intstapost/db seed",
+    "owner:create": "tsx scripts/create-owner.ts",
+    "worker": "pnpm --filter @intstapost/worker start"
+  },
+  "devDependencies": {
+    "@types/node": "^22.19.0",
+    "tsx": "^4.23.15",
+    "typescript": "~5.9.3",
+    "vitest": "^5.0.3",
+    "@intstapost/core": "workspace:*",
+    "@intstapost/db": "workspace:*"
+  }
+}
