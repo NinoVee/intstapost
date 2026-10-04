@@ -1,15 +1,13 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { and, eq, mediaAnalysis, mediaAssets, mediaSources, ne } from "@intstapost/db";
 import { requireUser } from "@/lib/auth";
 import { formatBytes, formatDuration } from "@/lib/format";
-import { mediaUrl } from "@/lib/media-urls";
-import { db } from "@/lib/server";
+import { getAssetDetail, type ScoreKey } from "@/lib/queries";
 import { setAssetExcludedAction } from "../../actions";
 
 export const dynamic = "force-dynamic";
 
-const SCORE_LABELS: Array<[string, string]> = [
+const SCORE_LABELS: Array<[ScoreKey, string]> = [
   ["technicalScore", "Technical quality"],
   ["compositionScore", "Composition"],
   ["personalRelevanceScore", "Personal relevance"],
@@ -20,32 +18,16 @@ const SCORE_LABELS: Array<[string, string]> = [
 
 export default async function AssetPage({ params }: { params: Promise<{ id: string }> }) {
   const user = await requireUser();
-  const { id } = await params;
-  if (!/^[0-9a-f-]{36}$/i.test(id)) notFound();
-
-  const [row] = await db()
-    .select({ asset: mediaAssets, source: mediaSources.name })
-    .from(mediaAssets)
-    .leftJoin(mediaSources, eq(mediaSources.id, mediaAssets.sourceId))
-    .where(and(eq(mediaAssets.id, id), eq(mediaAssets.userId, user.id)))
-    .limit(1);
-  if (!row) notFound();
-  const a = row.asset;
-  const analyses = await db().select().from(mediaAnalysis).where(eq(mediaAnalysis.assetId, a.id));
-  const det = analyses.find((x) => x.stage === "deterministic");
-  const ai = analyses.find((x) => x.stage === "ai");
-  const siblings = a.duplicateClusterId
-    ? await db()
-        .select({ id: mediaAssets.id, preview: mediaAssets.previewStorageKey, rep: mediaAssets.isClusterRepresentative })
-        .from(mediaAssets)
-        .where(and(eq(mediaAssets.duplicateClusterId, a.duplicateClusterId), ne(mediaAssets.id, a.id), eq(mediaAssets.userId, user.id)))
-        .limit(24)
-    : [];
-
-  const preview = mediaUrl(a.previewStorageKey, user.id);
-  const original = mediaUrl(a.originalStorageKey, user.id);
+  const detail = await getAssetDetail(user.id, (await params).id);
+  if (!detail) notFound();
+  const a = detail.asset;
+  const det = detail.deterministic;
+  const row = { source: detail.source };
+  const siblings = detail.similar;
+  const preview = detail.previewUrl;
+  const original = detail.originalUrl;
   const camera = (a.metadata.camera ?? {}) as Record<string, unknown>;
-  const scoreOf = (k: string) => (ai?.[k as keyof typeof ai] ?? det?.[k as keyof typeof det]) as number | null | undefined;
+  const scoreOf = (k: ScoreKey) => detail.scores[k];
 
   return (
     <>
@@ -149,9 +131,9 @@ export default async function AssetPage({ params }: { params: Promise<{ id: stri
               </p>
               <div className="grid grid-media" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(80px, 1fr))" }}>
                 {siblings.map((s) => {
-                  const u = mediaUrl(s.preview, user.id);
+                  const u = s.previewUrl;
                   return (
-                    <Link key={s.id} href={`/library/${s.id}`} className={`tile${s.rep ? "" : " dim"}`}>
+                    <Link key={s.id} href={`/library/${s.id}`} className={`tile${s.isRepresentative ? "" : " dim"}`}>
                       {u ? <img src={u} alt="" loading="lazy" /> : null}
                     </Link>
                   );

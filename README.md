@@ -26,6 +26,12 @@ pnpm dev                      # web on :3000 + worker
 
 Open http://localhost:3000, sign in, and drop photos and videos on **Library**.
 
+## iPhone, iPad & Mac app
+
+A native SwiftUI app lives in [`apps/apple`](apps/apple/README.md). It signs in to your server, shows
+Today's drafts (approve, save, reject), browses the library and uploads straight from your Photos
+library, including iCloud Photos. Build it with Xcode: `brew install xcodegen && cd apps/apple && xcodegen`.
+
 ## Quick start (Docker)
 
 ```bash
@@ -50,6 +56,7 @@ All ports bind to 127.0.0.1. Use a TLS reverse proxy or VPN for remote access.
 | `pnpm db:generate` / `pnpm db:migrate` | Create / apply migrations |
 | `pnpm owner:create` | Create the owner or reset their password (no public sign-up) |
 | `pnpm --filter @intstapost/worker run-job DailyMediaScan` | Run a scheduled job now |
+| `OWNER_PASSWORD=… scripts/api-smoke-test.sh http://localhost:3000 you@example.com photo.jpg` | Check the app API end to end |
 
 ## Docs
 

@@ -2,8 +2,8 @@ import { NextResponse } from "next/server";
 import { AppError } from "@intstapost/core";
 import { and, eq, mediaSources } from "@intstapost/db";
 import { ingestMedia } from "@intstapost/media";
-import { clientIp, getCurrentUser } from "@/lib/auth";
-import { isSameOrigin, jsonError } from "@/lib/http";
+import { clientIp } from "@/lib/auth";
+import { authenticateApi, jsonError } from "@/lib/http";
 import { db, env, intakeQueue, storage } from "@/lib/server";
 
 export const runtime = "nodejs";
@@ -13,9 +13,9 @@ const MAX_FILES = 50;
 
 export async function POST(req: Request) {
   try {
-    if (!isSameOrigin(req)) return NextResponse.json({ error: "Bad origin" }, { status: 403 });
-    const user = await getCurrentUser();
-    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const auth = await authenticateApi(req, { mutation: true });
+    if (auth instanceof NextResponse) return auth;
+    const user = auth.user;
 
     const form = await req.formData();
     const files = form.getAll("files").filter((f): f is File => f instanceof File);

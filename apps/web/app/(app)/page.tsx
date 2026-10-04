@@ -1,66 +1,15 @@
 import Link from "next/link";
-import { agentRuns, and, contentDrafts, contentThemes, count, desc, draftMedia, eq, gte, inArray, mediaAssets, sql } from "@intstapost/db";
-import { DraftCard, type DraftCardData } from "@/components/DraftCard";
+import { DraftCard } from "@/components/DraftCard";
 import { requireUser } from "@/lib/auth";
 import { greeting } from "@/lib/format";
-import { mediaUrl } from "@/lib/media-urls";
-import { db, env } from "@/lib/server";
+import { listActiveDrafts, pipelineStats, recentAgentRuns } from "@/lib/queries";
+import { env } from "@/lib/server";
 
 export const dynamic = "force-dynamic";
 
 export default async function TodayPage() {
   const user = await requireUser();
-  const d = db();
-  const since = new Date(Date.now() - 86400_000);
-
-  const drafts = await d
-    .select({
-      id: contentDrafts.id,
-      format: contentDrafts.format,
-      status: contentDrafts.status,
-      theme: contentThemes.name,
-      qualityScore: contentDrafts.qualityScore,
-      aiModified: contentDrafts.aiModified,
-      containsChildren: contentDrafts.containsChildren,
-      containsFamily: contentDrafts.containsFamily,
-    })
-    .from(contentDrafts)
-    .leftJoin(contentThemes, eq(contentThemes.id, contentDrafts.primaryThemeId))
-    .where(and(eq(contentDrafts.userId, user.id), inArray(contentDrafts.status, ["ready_for_review", "generating", "approved"])))
-    .orderBy(desc(contentDrafts.createdAt))
-    .limit(12);
-
-  const covers = drafts.length
-    ? await d
-        .select({ draftId: draftMedia.draftId, position: draftMedia.position, preview: mediaAssets.previewStorageKey })
-        .from(draftMedia)
-        .innerJoin(mediaAssets, eq(mediaAssets.id, draftMedia.assetId))
-        .where(inArray(draftMedia.draftId, drafts.map((x) => x.id)))
-    : [];
-
-  const cards: DraftCardData[] = drafts.map((x) => {
-    const media = covers.filter((c) => c.draftId === x.id).sort((a, b) => a.position - b.position);
-    return { ...x, coverUrl: mediaUrl(media[0]?.preview, user.id), slides: media.length };
-  });
-
-  const [stats] = await d
-    .select({
-      total: count(),
-      today: sql<number>`count(*) filter (where ${mediaAssets.createdAt} >= ${since.toISOString()}::timestamptz)`,
-      analyzed: sql<number>`count(*) filter (where ${mediaAssets.status} = 'analyzed')`,
-      pending: sql<number>`count(*) filter (where ${mediaAssets.status} in ('ingested','analyzing'))`,
-      unusable: sql<number>`count(*) filter (where ${mediaAssets.status} = 'unusable')`,
-      duplicates: sql<number>`count(*) filter (where ${mediaAssets.isClusterRepresentative} = false)`,
-    })
-    .from(mediaAssets)
-    .where(eq(mediaAssets.userId, user.id));
-
-  const runs = await d
-    .select()
-    .from(agentRuns)
-    .where(gte(agentRuns.createdAt, new Date(Date.now() - 7 * 86400_000)))
-    .orderBy(desc(agentRuns.createdAt))
-    .limit(6);
+  const [cards, stats, runs] = await Promise.all([listActiveDrafts(user.id), pipelineStats(user.id), recentAgentRuns()]);
 
   const publishing = env().PUBLISHING_ENABLED;
   const today = new Intl.DateTimeFormat("en-US", { weekday: "long", month: "long", day: "numeric", timeZone: user.timezone }).format(new Date());

@@ -71,6 +71,7 @@ touching the content engine:
 apps/
   web/        Next.js 16 (App Router) dashboard + API routes (upload, signed media, health)
   worker/     BullMQ workers (analysis queue, scheduled agent jobs) + run-job CLI
+  apple/      SwiftUI app for iPhone, iPad and Mac (client of the JSON API, bearer-token auth)
 packages/
   core/       env validation, logger, crypto, policies (approval, identity guard), provider interfaces, themes, brand profile
   db/         Drizzle schema, SQL migrations, draft-decision service, test DB helper
@@ -84,6 +85,9 @@ scripts/      create-owner CLI
 
 - **web**: Next.js standalone server. Server components read Postgres directly. Uploads are ingested
   synchronously (hash, store, insert) and analysis is queued.
+- **JSON API** (`/api/auth/*`, `/api/me`, `/api/today`, `/api/drafts/{id}/decision`, `/api/media*`):
+  used by the Apple app. It shares its queries (`apps/web/lib/queries.ts`) and draft-decision service with
+  the web pages, so both clients enforce identical rules.
 - **worker**: consumes `media-intake` (per-asset analysis, concurrency 2) and `agent` (scheduled jobs,
   concurrency 1). Every scheduled run is recorded in `agent_runs`. Jobs that aren't built yet record
   `skipped` honestly instead of pretending to succeed.

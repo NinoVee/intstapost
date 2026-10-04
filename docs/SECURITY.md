@@ -24,8 +24,9 @@ This app processes personal photos and videos, including family and children. Pr
 | Credentials at rest | AES-256-GCM with the row ID as associated data (`encryptSecret`), so ciphertext can't be moved between rows. |
 | Passwords | scrypt (N=16384, r=8, p=1), with constant-time comparison and a real dummy hash for unknown emails. |
 | Sessions | 256-bit random token in an `httpOnly`, `SameSite=Lax` cookie (`Secure` over https). Only its SHA-256 is stored. 30-day expiry. |
+| App sessions | `POST /api/auth/login` returns a bearer token in the body (never a cookie). It uses the same sessions table, throttling and audit log as the web login. Logout revokes it server-side. The Apple app keeps it in the Keychain (device-only) and refuses plain http except on local networks. |
 | Brute force | 5 failures per email+IP per 15 minutes (in-memory; single instance). |
-| CSRF | Server Actions: Next.js origin check. Route handlers: explicit `Origin` must match `APP_URL`. |
+| CSRF | Server Actions: Next.js origin check. Cookie-authenticated API mutations: explicit `Origin` must match `APP_URL`. Bearer-token requests carry no ambient credentials, so they need no origin check. Login accepts JSON only. |
 | Media access | Private storage. `/api/media/file` requires **both** a valid session and an HMAC-signed, short-lived (default 300 s) URL bound to that user and key. Keys outside the user's namespace are refused. |
 | Upload validation | Magic-byte type detection (never the filename or client MIME), size limit, allow-listed formats. |
 | Path safety | Storage keys are validated. Folder imports are restricted to `MEDIA_IMPORT_ROOTS` with realpath checks, so symlink escapes are refused. |

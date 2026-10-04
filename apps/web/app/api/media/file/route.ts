@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { verifyMediaSignature } from "@intstapost/media";
-import { getCurrentUser } from "@/lib/auth";
+import { getCurrentUser } from "@/lib/auth"; // cookie (web) or bearer (app)
 import { env, storage } from "@/lib/server";
 
 export const runtime = "nodejs";
