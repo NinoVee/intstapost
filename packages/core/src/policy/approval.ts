@@ -91,7 +91,8 @@ const TRANSITIONS: Record<DraftStatus, DraftStatus[]> = {
 };
 
 export type Actor = "user" | "agent" | "system";
-const AGENT_ALLOWED_TARGETS: DraftStatus[] = ["generating", "ready_for_review", "failed"];
+/** Saving for later is reversible and never publishes, so an agent may do it on the user's behalf. */
+const AGENT_ALLOWED_TARGETS: DraftStatus[] = ["generating", "ready_for_review", "failed", "saved_for_later"];
 
 export function assertTransition(from: DraftStatus, to: DraftStatus, actor: Actor): void {
   if (!TRANSITIONS[from].includes(to)) throw new PolicyViolationError(`Illegal draft transition ${from} → ${to}`);

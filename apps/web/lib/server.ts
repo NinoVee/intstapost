@@ -4,9 +4,9 @@ import { Redis } from "ioredis";
 import { getEnv, type Env } from "@intstapost/core/env";
 import { getDb, type Database } from "@intstapost/db";
 import { createStorage, type StorageDriver } from "@intstapost/media";
-import { QUEUES, type IntakeJob } from "@intstapost/core";
+import { QUEUES, type AgentJob, type IntakeJob } from "@intstapost/core";
 
-const g = globalThis as unknown as { __storage?: StorageDriver; __intakeQueue?: Queue<IntakeJob> };
+const g = globalThis as unknown as { __storage?: StorageDriver; __intakeQueue?: Queue<IntakeJob>; __agentQueue?: Queue<AgentJob> };
 
 export function env(): Env {
   return getEnv();
@@ -29,4 +29,9 @@ export function createRedis(url: string): Redis {
 export function intakeQueue(): Queue<IntakeJob> {
   g.__intakeQueue ??= new Queue<IntakeJob>(QUEUES.intake, { connection: createRedis(env().REDIS_URL) });
   return g.__intakeQueue;
+}
+
+export function agentQueue(): Queue<AgentJob> {
+  g.__agentQueue ??= new Queue<AgentJob>(QUEUES.agent, { connection: createRedis(env().REDIS_URL) });
+  return g.__agentQueue;
 }

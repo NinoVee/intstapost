@@ -2,8 +2,8 @@ import "server-only";
 import { cache } from "react";
 import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
-import { hashPassword, randomToken, sha256Hex, verifyPassword } from "@intstapost/core";
-import { and, audit, eq, gt, sessions, users } from "@intstapost/db";
+import { hashPassword, isAgentKey, normalizeScopes, randomToken, sha256Hex, verifyPassword, type Principal } from "@intstapost/core";
+import { agentKeys, and, audit, eq, gt, isNull, sessions, users } from "@intstapost/db";
 import { db, env } from "./server";
 
 export const SESSION_COOKIE = "ip_session";
@@ -103,7 +103,7 @@ export async function logout(): Promise<void> {
   jar.delete(SESSION_COOKIE);
 }
 
-/** Extracts a bearer token (native app) from the Authorization header. */
+/** Extracts a bearer token (native app or AI agent key) from the Authorization header. */
 export function parseBearer(header: string | null): string | null {
   const m = header?.match(/^Bearer\s+([A-Za-z0-9_-]{20,200})$/);
   return m?.[1] ?? null;
@@ -114,10 +114,53 @@ export interface Auth {
   /** "bearer" requests carry no ambient credentials, so they are not CSRF-prone. */
   via: "cookie" | "bearer";
   token: string;
+  /** The human owner, or an external AI agent acting with a scoped key. */
+  principal: Principal;
+}
+
+/* Per-agent-key rate limit: 120 requests / minute (single instance, in-memory). */
+const agentHits = new Map<string, { count: number; resetAt: number }>();
+export function agentRateLimited(keyId: string, now = Date.now()): boolean {
+  const h = agentHits.get(keyId);
+  if (!h || h.resetAt < now) {
+    agentHits.set(keyId, { count: 1, resetAt: now + 60_000 });
+    return false;
+  }
+  h.count++;
+  return h.count > 120;
+}
+
+async function agentAuth(token: string): Promise<Auth | null> {
+  const [row] = await db()
+    .select({
+      keyId: agentKeys.id,
+      name: agentKeys.name,
+      scopes: agentKeys.scopes,
+      lastUsedAt: agentKeys.lastUsedAt,
+      id: users.id,
+      email: users.email,
+      displayName: users.displayName,
+      timezone: users.timezone,
+    })
+    .from(agentKeys)
+    .innerJoin(users, eq(users.id, agentKeys.userId))
+    .where(and(eq(agentKeys.keyHash, sha256Hex(token)), isNull(agentKeys.revokedAt)))
+    .limit(1);
+  if (!row) return null;
+  if (!row.lastUsedAt || Date.now() - row.lastUsedAt.getTime() > 60_000) {
+    await db().update(agentKeys).set({ lastUsedAt: new Date() }).where(eq(agentKeys.id, row.keyId));
+  }
+  return {
+    user: { id: row.id, email: row.email, displayName: row.displayName, timezone: row.timezone },
+    via: "bearer",
+    token,
+    principal: { kind: "agent", keyId: row.keyId, name: row.name, scopes: normalizeScopes(row.scopes) },
+  };
 }
 
 export const getAuth = cache(async (): Promise<Auth | null> => {
   const bearer = parseBearer((await headers()).get("authorization"));
+  if (bearer && isAgentKey(bearer)) return agentAuth(bearer);
   const cookie = (await cookies()).get(SESSION_COOKIE)?.value;
   const token = bearer ?? cookie;
   if (!token) return null;
@@ -127,11 +170,13 @@ export const getAuth = cache(async (): Promise<Auth | null> => {
     .innerJoin(users, eq(users.id, sessions.userId))
     .where(and(eq(sessions.id, sha256Hex(token)), gt(sessions.expiresAt, new Date())))
     .limit(1);
-  return row ? { user: row, via: bearer ? "bearer" : "cookie", token } : null;
+  return row ? { user: row, via: bearer ? "bearer" : "cookie", token, principal: { kind: "user" } } : null;
 });
 
+/** The signed-in HUMAN. Agent keys never count, so they can't open web pages or run server actions. */
 export async function getCurrentUser(): Promise<CurrentUser | null> {
-  return (await getAuth())?.user ?? null;
+  const auth = await getAuth();
+  return auth && auth.principal.kind === "user" ? auth.user : null;
 }
 
 export async function requireUser(): Promise<CurrentUser> {

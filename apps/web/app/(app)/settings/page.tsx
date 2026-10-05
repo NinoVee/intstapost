@@ -1,9 +1,11 @@
 import { asc, brandProfiles, contentThemes, desc, eq, schedules } from "@intstapost/db";
-import { EDIT_INTENSITY_LABELS, brandProfileSchema, type EditIntensity } from "@intstapost/core";
+import { AGENT_SCOPES, AGENT_SCOPE_INFO, EDIT_INTENSITY_LABELS, brandProfileSchema, type EditIntensity } from "@intstapost/core";
+import { AgentKeyForm } from "@/components/AgentKeyForm";
+import { listAgentKeys } from "@/lib/agent-keys";
 import { requireUser } from "@/lib/auth";
 import { integrationStatuses } from "@/lib/integrations";
 import { db, env } from "@/lib/server";
-import { addThemeAction, deleteThemeAction, renameThemeAction, setThemeEnabledAction, setThemePriorityAction } from "../actions";
+import { addThemeAction, deleteThemeAction, renameThemeAction, revokeAgentKeyAction, setThemeEnabledAction, setThemePriorityAction } from "../actions";
 
 export const dynamic = "force-dynamic";
 
@@ -18,6 +20,8 @@ export default async function SettingsPage() {
   const profile = brandProfileSchema.parse(profileRow?.settings ?? {});
   const jobs = await db().select().from(schedules).orderBy(asc(schedules.jobName));
   const e = env();
+  const keys = await listAgentKeys(user.id);
+  const mcpUrl = new URL("/api/mcp", e.APP_URL).toString();
 
   return (
     <>
@@ -108,6 +112,51 @@ export default async function SettingsPage() {
           <input type="text" name="name" placeholder="New theme name" required minLength={2} maxLength={40} />
           <button className="btn primary" type="submit">Add</button>
         </form>
+      </div>
+
+      <h2>AI agents</h2>
+      <div className="card">
+        <p className="small" style={{ marginTop: 0 }}>
+          Let an AI assistant such as Meta Muse or Claude check today&apos;s drafts, organise your library and start jobs through the MCP
+          address <code>{mcpUrl}</code>. <strong>Agents can never approve, reject, publish or upload</strong>. Those stay with you. Photos are
+          only shared if you tick “View photos”.
+        </p>
+        {keys.length ? (
+          <div className="table-wrap" style={{ marginBottom: 16 }}>
+            <table>
+              <thead>
+                <tr>
+                  <th>Agent</th>
+                  <th>Permissions</th>
+                  <th>Last used</th>
+                  <th />
+                </tr>
+              </thead>
+              <tbody>
+                {keys.map((k) => (
+                  <tr key={k.id}>
+                    <td>
+                      <strong>{k.name}</strong>
+                      <div className="muted small">
+                        <code>{k.keyHint}…</code>
+                      </div>
+                    </td>
+                    <td className="small">{k.scopes.map((s) => AGENT_SCOPE_INFO[s as keyof typeof AGENT_SCOPE_INFO]?.label ?? s).join(", ")}</td>
+                    <td className="muted small">
+                      {k.lastUsedAt ? k.lastUsedAt.toLocaleString("en-US", { timeZone: user.timezone, dateStyle: "medium", timeStyle: "short" }) : "Never"}
+                    </td>
+                    <td>
+                      <form action={revokeAgentKeyAction.bind(null, k.id)}>
+                        <button className="btn small danger">Revoke</button>
+                      </form>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : null}
+        <AgentKeyForm mcpUrl={mcpUrl} scopes={AGENT_SCOPES.map((s) => ({ value: s, ...AGENT_SCOPE_INFO[s] }))} />
       </div>
 
       <h2>Integrations</h2>

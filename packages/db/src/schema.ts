@@ -107,6 +107,29 @@ export const sessions = pgTable(
   (t) => [index("sessions_user_idx").on(t.userId)],
 );
 
+/**
+ * Scoped keys for external AI agents (Meta Muse, Claude, …). Only the SHA-256 of the key is
+ * stored. Agent keys can never approve, reject or publish (see policy/agent-access.ts).
+ */
+export const agentKeys = pgTable(
+  "agent_keys",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    keyHash: text("key_hash").notNull().unique(),
+    /** First characters of the key, shown in Settings so keys can be told apart. */
+    keyHint: text("key_hint").notNull(),
+    scopes: text("scopes").array().notNull(),
+    lastUsedAt: timestamp("last_used_at", { withTimezone: true }),
+    revokedAt: timestamp("revoked_at", { withTimezone: true }),
+    createdAt: createdAt(),
+  },
+  (t) => [index("agent_keys_user_idx").on(t.userId)],
+);
+
 /* ------------------------------------------------------------------ integrations & sources */
 
 export const integrations = pgTable(

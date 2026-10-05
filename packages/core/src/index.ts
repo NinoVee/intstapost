@@ -13,3 +13,4 @@ export * from "./providers/ai-provider";
 export * from "./themes/defaults";
 export * from "./brand/profile";
 export * from "./jobs";
+export * from "./policy/agent-access";

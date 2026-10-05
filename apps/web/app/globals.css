@@ -245,7 +245,7 @@ h3 {
 
 .kv {
   display: grid;
-  grid-template-columns: auto 1fr;
+  grid-template-columns: auto minmax(0, 1fr);
   gap: 4px 12px;
   font-size: 14px;
 }
@@ -256,7 +256,13 @@ h3 {
 
 .kv dd {
   margin: 0;
+  min-width: 0;
   overflow-wrap: anywhere;
+}
+
+/* Long status badges inside detail lists must wrap on phones. */
+.kv .pill {
+  white-space: normal;
 }
 
 /* ---------- media tiles ---------- */

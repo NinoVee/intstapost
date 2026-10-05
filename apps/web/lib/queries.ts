@@ -18,6 +18,7 @@ import {
   sql,
   type SQL,
 } from "@intstapost/db";
+import type { DraftStatus } from "@intstapost/core";
 import { mediaUrl } from "./media-urls";
 import { db } from "./server";
 
@@ -37,7 +38,13 @@ export interface DraftSummary {
   createdAt: Date;
 }
 
+export const ACTIVE_DRAFT_STATUSES = ["ready_for_review", "generating", "approved"] as const;
+
 export async function listActiveDrafts(userId: string, limit = 12): Promise<DraftSummary[]> {
+  return listDrafts(userId, [...ACTIVE_DRAFT_STATUSES], limit);
+}
+
+export async function listDrafts(userId: string, statuses: DraftStatus[], limit = 12): Promise<DraftSummary[]> {
   const d = db();
   const drafts = await d
     .select({
@@ -53,7 +60,7 @@ export async function listActiveDrafts(userId: string, limit = 12): Promise<Draf
     })
     .from(contentDrafts)
     .leftJoin(contentThemes, eq(contentThemes.id, contentDrafts.primaryThemeId))
-    .where(and(eq(contentDrafts.userId, userId), inArray(contentDrafts.status, ["ready_for_review", "generating", "approved"])))
+    .where(and(eq(contentDrafts.userId, userId), inArray(contentDrafts.status, statuses)))
     .orderBy(desc(contentDrafts.createdAt))
     .limit(limit);
   if (!drafts.length) return [];

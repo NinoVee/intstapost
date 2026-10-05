@@ -88,6 +88,9 @@ scripts/      create-owner CLI
 - **JSON API** (`/api/auth/*`, `/api/me`, `/api/today`, `/api/drafts/{id}/decision`, `/api/media*`):
   used by the Apple app. It shares its queries (`apps/web/lib/queries.ts`) and draft-decision service with
   the web pages, so both clients enforce identical rules.
+- **MCP server** (`/api/mcp`, Streamable HTTP, stateless): for external AI agents such as Meta Muse or
+  Claude, authenticated with scoped agent keys. Tools are registered per permission, and none can approve,
+  reject, publish or upload (`packages/core/src/policy/agent-access.ts`). See [AGENTS.md](AGENTS.md).
 - **worker**: consumes `media-intake` (per-asset analysis, concurrency 2) and `agent` (scheduled jobs,
   concurrency 1). Every scheduled run is recorded in `agent_runs`. Jobs that aren't built yet record
   `skipped` honestly instead of pretending to succeed.

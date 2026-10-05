@@ -13,6 +13,7 @@
     "@intstapost/core": "workspace:*",
     "@intstapost/db": "workspace:*",
     "@intstapost/media": "workspace:*",
+    "@modelcontextprotocol/sdk": "^1.32.0",
     "bullmq": "^6.3.11",
     "ioredis": "^5.11.1",
     "next": "^16.3.8",

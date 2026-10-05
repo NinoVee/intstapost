@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { verifyMediaSignature } from "@intstapost/media";
-import { getCurrentUser } from "@/lib/auth"; // cookie (web) or bearer (app)
+import { principalCan } from "@intstapost/core";
+import { getAuth } from "@/lib/auth";
 import { env, storage } from "@/lib/server";
 
 export const runtime = "nodejs";
@@ -23,8 +24,11 @@ const TYPES: Record<string, string> = {
 
 /** Serves private media: requires BOTH a valid session and a valid, unexpired signature for that user. */
 export async function GET(req: Request) {
-  const user = await getCurrentUser();
-  if (!user) return new NextResponse("Unauthorized", { status: 401 });
+  // Web session, Apple app token, or an agent key that was explicitly given the "media" scope.
+  const auth = await getAuth();
+  if (!auth) return new NextResponse("Unauthorized", { status: 401 });
+  if (!principalCan(auth.principal, "media")) return new NextResponse("This agent key may not view photos", { status: 403 });
+  const user = auth.user;
   const sp = new URL(req.url).searchParams;
   const v = verifyMediaSignature({ key: sp.get("key"), exp: sp.get("exp"), sig: sp.get("sig") }, user.id, env().APP_SECRET);
   if (!v.ok) return new NextResponse("Forbidden", { status: 403 });

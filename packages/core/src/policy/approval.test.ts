@@ -60,6 +60,8 @@ describe("draft transitions", () => {
     expect(() => assertTransition("ready_for_review", "approved", "agent")).toThrow(/Only a human/);
     expect(() => assertTransition("approved", "published", "agent")).toThrow(/Only a human/);
     expect(() => assertTransition("ready_for_review", "approved", "user")).not.toThrow();
+    expect(() => assertTransition("ready_for_review", "rejected", "agent")).toThrow(/Only a human/);
+    expect(() => assertTransition("ready_for_review", "saved_for_later", "agent")).not.toThrow();
   });
 
   it("rejects illegal transitions", () => {

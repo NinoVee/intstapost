@@ -15,6 +15,7 @@ import {
   saveDraftForLater,
 } from "@intstapost/db";
 import { clientIp, logout, requireUser } from "@/lib/auth";
+import { createAgentKey, revokeAgentKey } from "@/lib/agent-keys";
 import { db } from "@/lib/server";
 
 const uuid = z.string().uuid();
@@ -106,5 +107,25 @@ export async function deleteThemeAction(themeId: string) {
   await db()
     .delete(contentThemes)
     .where(and(eq(contentThemes.id, uuid.parse(themeId)), eq(contentThemes.userId, user.id)));
+  revalidatePath("/settings");
+}
+
+/* ---------- AI agent keys (human-only) ---------- */
+
+export type CreateKeyState = { key?: string; name?: string; error?: string } | undefined;
+
+export async function createAgentKeyAction(_prev: CreateKeyState, form: FormData): Promise<CreateKeyState> {
+  const user = await requireUser();
+  const name = z.string().trim().min(1).max(60).safeParse(form.get("name"));
+  if (!name.success) return { error: "Give the key a name, e.g. “Meta Muse”." };
+  const scopes = form.getAll("scopes").filter((v): v is string => typeof v === "string");
+  const { key } = await createAgentKey(user.id, name.data, scopes, await clientIp());
+  revalidatePath("/settings");
+  return { key, name: name.data };
+}
+
+export async function revokeAgentKeyAction(keyId: string) {
+  const user = await requireUser();
+  await revokeAgentKey(user.id, uuid.parse(keyId), await clientIp());
   revalidatePath("/settings");
 }

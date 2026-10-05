@@ -82,13 +82,21 @@ export async function rejectDraft(db: Database, userId: string, draftId: string,
   });
 }
 
-export async function saveDraftForLater(db: Database, userId: string, draftId: string, ip?: string | null) {
+/** Reversible and never publishes, so an AI agent may do this on the user's behalf (actor "agent"). */
+export async function saveDraftForLater(
+  db: Database,
+  userId: string,
+  draftId: string,
+  ip?: string | null,
+  by: { actor: "user" | "agent"; agentKeyId?: string } = { actor: "user" },
+) {
   return db.transaction(async (tx) => {
     const draft = await getOwnedDraft(tx, userId, draftId);
-    assertTransition(draft.status as DraftStatus, "saved_for_later", "user");
+    assertTransition(draft.status as DraftStatus, "saved_for_later", by.actor);
     await tx.update(contentDrafts).set({ status: "saved_for_later" }).where(eq(contentDrafts.id, draftId));
-    await tx.insert(feedback).values({ userId, draftId, signal: "save_for_later", context: await snapshot(tx, draftId) });
-    await audit(tx, { userId, actor: "user", action: "draft.saved_for_later", entityType: "content_draft", entityId: draftId, ipAddress: ip });
+    // Only a human decision is a taste signal; an agent's request is recorded but marked as such.
+    await tx.insert(feedback).values({ userId, draftId, signal: "save_for_later", context: { ...(await snapshot(tx, draftId)), via: by.actor } });
+    await audit(tx, { userId, actor: by.actor, action: "draft.saved_for_later", entityType: "content_draft", entityId: draftId, metadata: by.agentKeyId ? { agentKeyId: by.agentKeyId } : {}, ipAddress: ip });
   });
 }
 

@@ -32,6 +32,12 @@ A native SwiftUI app lives in [`apps/apple`](apps/apple/README.md). It signs in 
 Today's drafts (approve, save, reject), browses the library and uploads straight from your Photos
 library, including iCloud Photos. Build it with Xcode: `brew install xcodegen && cd apps/apple && xcodegen`.
 
+## AI agents (Meta Muse, Claude)
+
+Let an assistant like Meta Muse check today's drafts, organise your library and start scans for you,
+through the built-in MCP server at `/api/mcp`. Create a scoped key in **Settings → AI agents**.
+Agents can never approve, reject, publish or upload. See [docs/AGENTS.md](docs/AGENTS.md).
+
 ## Quick start (Docker)
 
 ```bash
@@ -64,4 +70,5 @@ All ports bind to 127.0.0.1. Use a TLS reverse proxy or VPN for remote access.
 - [Data model](docs/DATA_MODEL.md)
 - [Integrations](docs/INTEGRATIONS.md): what each official API can and can't do (verified Oct 2026)
 - [Security & privacy](docs/SECURITY.md)
+- [AI agents / MCP](docs/AGENTS.md): connecting Meta Muse, Claude and other agents
 - [Roadmap](docs/ROADMAP.md)

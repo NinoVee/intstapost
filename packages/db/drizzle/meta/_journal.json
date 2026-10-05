@@ -15,6 +15,13 @@
       "when": 1791064423549,
       "tag": "0001_immutability_guards",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1791167036620,
+      "tag": "0002_agent_keys",
+      "breakpoints": true
     }
   ]
 }

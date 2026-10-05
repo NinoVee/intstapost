@@ -13,7 +13,7 @@ const MAX_FILES = 50;
 
 export async function POST(req: Request) {
   try {
-    const auth = await authenticateApi(req, { mutation: true });
+    const auth = await authenticateApi(req, { mutation: true, capability: "upload" });
     if (auth instanceof NextResponse) return auth;
     const user = auth.user;
 

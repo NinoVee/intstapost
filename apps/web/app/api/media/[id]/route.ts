@@ -2,14 +2,14 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { and, audit, eq, mediaAssets } from "@intstapost/db";
 import { clientIp } from "@/lib/auth";
-import { authenticateApi, jsonError } from "@/lib/http";
+import { actorOf, authenticateApi, canSeeMedia, jsonError } from "@/lib/http";
 import { getAssetDetail } from "@/lib/queries";
 import { db } from "@/lib/server";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
-  const auth = await authenticateApi(req, { mutation: false });
+  const auth = await authenticateApi(req, { mutation: false, capability: "read" });
   if (auth instanceof NextResponse) return auth;
   try {
     const detail = await getAssetDetail(auth.user.id, (await params).id);
@@ -35,9 +35,9 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
         createdAt: a.createdAt,
       },
       scores: detail.scores,
-      previewUrl: detail.previewUrl,
-      originalUrl: detail.originalUrl,
-      similar: detail.similar,
+      previewUrl: canSeeMedia(auth) ? detail.previewUrl : null,
+      originalUrl: canSeeMedia(auth) ? detail.originalUrl : null,
+      similar: canSeeMedia(auth) ? detail.similar : detail.similar.map((s) => ({ ...s, previewUrl: null })),
     });
   } catch (err) {
     return jsonError(err);
@@ -48,7 +48,7 @@ const patchSchema = z.object({ excluded: z.boolean() });
 
 /** "Never use this picture" toggle (reversible). */
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
-  const auth = await authenticateApi(req, { mutation: true });
+  const auth = await authenticateApi(req, { mutation: true, capability: "organize" });
   if (auth instanceof NextResponse) return auth;
   try {
     const { id } = await params;
@@ -60,7 +60,8 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
       .where(and(eq(mediaAssets.id, id), eq(mediaAssets.userId, auth.user.id)))
       .returning({ id: mediaAssets.id });
     if (!updated.length) return NextResponse.json({ error: "Not found" }, { status: 404 });
-    await audit(db(), { userId: auth.user.id, actor: "user", action: body.data.excluded ? "media.excluded" : "media.included", entityType: "media_asset", entityId: id, ipAddress: await clientIp() });
+    const by = actorOf(auth);
+    await audit(db(), { userId: auth.user.id, actor: by.actor, action: body.data.excluded ? "media.excluded" : "media.included", entityType: "media_asset", entityId: id, metadata: by.agentKeyId ? { agentKeyId: by.agentKeyId } : {}, ipAddress: await clientIp() });
     return NextResponse.json({ ok: true, excluded: body.data.excluded });
   } catch (err) {
     return jsonError(err);
